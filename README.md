@@ -11,9 +11,9 @@ Example:
 ```cml
 !DOCTYPE/: [html]
 html:
-  head:
-    title: CML Example
-  body:
+	head:
+		title: CML Example
+	body:
 		h1: Hello World
 ```
 
@@ -21,12 +21,12 @@ Serializes to this HTML:
 ```html
 <!DOCTYPE html>
 <html>
-  <head>
-    <title>HTML Example</title>
-  </head>
-  <body>
-    <h1>Hello World</h1>
-  </body>
+	<head>
+		<title>HTML Example</title>
+	</head>
+	<body>
+		<h1>Hello World</h1>
+	</body>
 </html>
 ```
 
