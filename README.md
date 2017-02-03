@@ -6,7 +6,18 @@ CML is a very simple script for defining document markup, it is designed to be 1
 CasualML shares it syntax with the likes of YAML and Python, but in design, it is a Keskern flavored language.
 (*More on Keskern later.*)
 
-This HTML:
+
+Example:
+```cml
+!DOCTYPE/: [html]
+html:
+  head:
+    title: CML Example
+  body:
+		h1: Hello World
+```
+
+Serializes to this HTML:
 ```html
 <!DOCTYPE html>
 <html>
@@ -17,16 +28,6 @@ This HTML:
     <h1>Hello World</h1>
   </body>
 </html>
-```
-
-Can become this CML:
-```cml
-!DOCTYPE/: [html]
-html:
-  head:
-    title: CML Example
-  body:
-		h1: Hello World
 ```
 
 Documentation for CML will happen *eventually*, but right now, I have to leave for work.
