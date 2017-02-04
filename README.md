@@ -67,3 +67,4 @@ CasualML also has some special features that transforms the output to make docum
 - [ ] File Imports (CSS, JS, HTML, CML etc.)
 - [ ] Re-add pluggable serialization.
 - [ ] \(\*Maybe\*\) Allow the use of tag functions in attribute tags.
+- [ ] Add proper errors/exceptions.
