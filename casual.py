@@ -1,5 +1,8 @@
 import re
 
+
+
+
 ##############################
 #/                          \#
 #|      Debug Options       |#
@@ -8,8 +11,6 @@ import re
 
 # Flatten nested arrays in tags and content
 ALLOW_TAG_FLATTENING = True
-
-
 
 
 
@@ -41,9 +42,6 @@ TAG_FUNCTIONS = {
 	"<": __tagfunc_riter__,
 	"&": __tagfunc_append__
 }
-
-
-
 
 
 
@@ -273,6 +271,7 @@ class Parser(object):
 		indent = False
 		attribute_bracket = False
 		list_bracket = False
+		last_bracket = None
 		nopop = False
 
 		context = Parser.Context()
@@ -295,7 +294,15 @@ class Parser(object):
 					continue
 			else:
 				if token[0] == Parser.Tokens.LINEBREAK:
-					if buffer and not list_bracket:
+					if list_bracket:
+						# This below re-tests for something we already knew...
+						# If the last token was a break or not, but because we already
+						# threw away that data, so we have to re-test.
+						# The only way I can think to fix this right now, is to
+						# include the whole token in the buffer.
+						if buffer and buffer[-1] not in ";,":
+							buffer.append(last_bracket)
+					elif buffer:
 						context.top.content.append(buffer)
 						buffer = []
 					depth = 0
@@ -304,6 +311,7 @@ class Parser(object):
 				elif token[0] == Parser.Tokens.BREAK:
 					if list_bracket:
 						buffer.append(token[1])
+						last_bracket = token[1]
 					else:
 						if buffer:
 							context.top.content.append(buffer)
@@ -339,6 +347,7 @@ class Parser(object):
 							context.top.content.append(buffer)
 							buffer = []
 						list_bracket = False
+						last_bracket = None
 					else:
 						buffer.append(token[1])
 				elif token[0] == Parser.Tokens.TAG:
