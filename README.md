@@ -7,7 +7,7 @@ The parser outputs a DOM-like object tree that closly mirrors the structure of t
 
 ## The Script
 
-CML, or *Casual Markup Language* is a very simple alternative to static HTML, with planned dynamic features. It's bracket-less syntax barrows from the likes of YAML and Python, and it's design is Keskern flavored.
+CML, or *Casual Markup Language* is a very simple alternative to static HTML, with planned dynamic features. Its bracket-less syntax barrows from the likes of YAML and Python, and its design is Keskern flavored.
 
 
 ## The Parser
