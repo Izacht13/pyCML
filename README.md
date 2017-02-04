@@ -44,13 +44,13 @@ Into this HTML:
 
 ## Special Features:
 
-CasualML also has some special features that transform the output to make document markup even easier.
+CasualML also has some special features that transforms the output to make document markup even easier.
 
 **Currently Implemented:**
 
-- Iterative child element creation, using the text of the parent.
-- Iterative sibling creation, using the children of the original element.
-- Shortcuts for `id` and `class` attributes, similar to CSS.
+- [Iterative child element creation, using the text of the parent.](https://github.com/Izacht13/pyCML/wiki/Child-Iterator)
+- [Iterative sibling creation, using the children of the original element.](https://github.com/Izacht13/pyCML/wiki/Sibling-Iterator)
+- [Shortcuts for `id` and `class` attributes, similar to CSS.](https://github.com/Izacht13/pyCML/wiki/Shortcuts)
 
 
 ## Pluggable/Hackable
@@ -58,7 +58,7 @@ CasualML also has some special features that transform the output to make docume
 - New "Tag Functions" can be added easily to a global dictionary.
 - The script's tokens can be easily accessed from the main parser class, via a generator.
 - ~~New serialiation schemes can be added, using a global dict.~~
-  ^^^ Removed because the implentation was buggy and messy, will hopefully return again soon.
+  *Removed because the implentation was buggy and messy, will hopefully return again soon.*
 	
 	
 ## Planned Features
@@ -66,3 +66,4 @@ CasualML also has some special features that transform the output to make docume
 - [ ] Scripting.
 - [ ] File Imports (CSS, JS, HTML, CML etc.)
 - [ ] Re-add pluggable serialization.
+- [ ] (*Maybe*) Allow the use of tag functions in attribute tags.
