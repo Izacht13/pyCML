@@ -12,7 +12,7 @@ setup(
     author="Isaac Torbett",
     author_email="izacht13@gmail.com",
     description="An interpreter for Casual Markup Language.",
-    packages=["pycasual"],
+    py_modules=["pycasual"],
     scripts=["pycasual.py"],
     keywords=["web html markup"],
     platforms="any",
