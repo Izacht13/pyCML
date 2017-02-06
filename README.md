@@ -1,18 +1,18 @@
-# pyCML
+# pyCasual
 
-*A CML parser, and serializer, written in python.*
+*A CasualML parser, and serializer, for Python 3+.*
 
 The parser outputs a DOM-like object tree that closly mirrors the structure of the script.
 
 
 ## The Script
 
-CML, or *Casual Markup Language* is a very simple alternative to static HTML, with planned dynamic features. Its bracket-less syntax barrows from the likes of YAML and Python, and its design is Keskern flavored.
+CasualML, or *Casual Markup Language* is a very simple alternative to static HTML, with planned dynamic features. Its bracket-less syntax barrows from the likes of YAML and Python.
 
 
 ## The Parser
 
-CML is a side project I started because I was annoyed with the verbosity of HTML. The first working parser turned CML into HTML on the fifth of January 2017, since then it has been rewritten two times before finally being posted here on Github, where it will now live and continue to grow.
+CasualML is a side project I started because I was annoyed with the verbosity of HTML. The first working parser turned CasualML into HTML on the fifth of January 2017, since then it has been rewritten two times before finally being posted here on Github, where it will now live and continue to grow.
 
 The parser can now successfully turn this CML:
 
@@ -20,7 +20,7 @@ The parser can now successfully turn this CML:
 !DOCTYPE/: [html]
 html:
 	head:
-		title: CML Example
+		title: Casual Example
 	body:
 		h1: Hello World
 ```
@@ -31,7 +31,7 @@ Into this HTML:
 <!DOCTYPE html>
 <html>
 	<head>
-		<title>HTML Example</title>
+		<title>Casual Example</title>
 	</head>
 	<body>
 		<h1>Hello World</h1>
@@ -48,9 +48,9 @@ CasualML also has some special features that transforms the output to make docum
 
 **Currently Implemented:**
 
-- [Iterative child element creation, using the text of the parent.](https://github.com/Izacht13/pyCML/wiki/Child-Iterator)
-- [Iterative sibling creation, using the children of the original element.](https://github.com/Izacht13/pyCML/wiki/Sibling-Iterator)
-- [Shortcuts for `id` and `class` attributes, similar to CSS.](https://github.com/Izacht13/pyCML/wiki/Shortcuts)
+- [Iterative child element creation, using the text of the parent.](https://github.com/Izacht13/pyCasual/wiki/Child-Iterator)
+- [Iterative sibling creation, using the children of the original element.](https://github.com/Izacht13/pyCasual/wiki/Sibling-Iterator)
+- [Shortcuts for `id` and `class` attributes, similar to CSS.](https://github.com/Izacht13/pyCasual/wiki/Shortcuts)
 
 
 ## Pluggable/Hackable
