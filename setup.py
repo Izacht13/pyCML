@@ -1,13 +1,13 @@
 from setuptools import setup, find_packages
 
 setup(
-    name='pycml',
+    name='pycasual',
     version="0.0.1",
-    url='http://github.com/izacht13/pycml/',
+    url='http://github.com/izacht13/pyCasual/',
     license='MIT',
     author='Isaac Torbett',
     author_email='izacht13@gmail.com',
-    description='An interpreter for CML.',
+    description='An interpreter for Casual Markup Language.',
     package_dir={'': 'src'},
     packages=find_packages('src'),
     keywords=['web html markup'],
