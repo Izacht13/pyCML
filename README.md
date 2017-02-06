@@ -1,6 +1,6 @@
 # pyCasual
 
-*A CasualML parser, and serializer, for Python 3+.*
+*A CasualML parser, and serializer, for Python 3.5+.*
 
 The parser outputs a DOM-like object tree that closly mirrors the structure of the script.
 
