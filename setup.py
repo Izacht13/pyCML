@@ -2,7 +2,10 @@
 pyCasual
 """
 
-from setuptools import setup
+try:
+    from setuptools import setup
+except ImportError:
+    from distutils.core import setup
 
 setup(
     name="pycasual",
@@ -19,7 +22,7 @@ setup(
     classifiers=[
         "Development Status :: 1 - Alpha",
         "Intended Audience :: Developers",
-        "Topic :: Software Development",
+        'Topic :: Software Development',
         "License :: OSI Approved :: MIT License",
         "Programming Language :: Python :: 3.5",
 		"Programming Language :: Python :: 3.6"
