@@ -157,9 +157,9 @@ class Element(TaggedContent):
 					function(self, args)
 				elif isinstance(function, str):
 					if function[0] == ':':
-						self.child(function[1:], args)
+						self.add_child(function[1:], args)
 					else:
-						self.attribute(function, args)
+						self.add_attribute(function, args)
 				# elif isinstance(function[t], re._pattern_type):
 				# 	for child in self.children:
 				# 		if function[t].search(''.join(child.tag))
