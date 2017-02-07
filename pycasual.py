@@ -189,7 +189,7 @@ class Root(Element):
 
 ##############################
 #/                          \#
-#|        CML Parser        |#
+#|     CasualML Parser      |#
 #\                          /#
 ##############################
 
@@ -395,7 +395,8 @@ class Parser(object):
                         else:
                             buffer.append(token[1])
                 else:
-                    buffer.append(token[1])
+                    if token[0] not in [ "COMMENT", "UNKNOWN" ]:
+                        buffer.append(token[1])
 
             token = next(tokens, None)
 
