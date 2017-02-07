@@ -394,9 +394,12 @@ class Parser(object):
                             buffer = []
                         else:
                             buffer.append(token[1])
+				elif token[0] == Parser.Tokens.COMMENT:
+					pass
+				elif token[0] == Parser.Tokens.UNKNOWN:
+					pass
                 else:
-                    if token[0] not in [ "COMMENT", "UNKNOWN" ]:
-                        buffer.append(token[1])
+                    buffer.append(token[1])
 
             token = next(tokens, None)
 
