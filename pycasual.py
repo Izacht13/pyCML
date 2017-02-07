@@ -31,8 +31,7 @@ def __tagfunc_riter__(element, args):
 		for i, tag in enumerate(args[1:]):
 			attributes.append(Attribute(tag, child.content[
 							  i] if i < l and child.content != ' ' else None))
-		element.parent.children.append(
-			Element(element.tag, attributes=attributes))
+		element.parent.add_child(element.tag, attributes=attributes)
 	element.parent.children.remove(element)
 
 TAG_FUNCTIONS = {
@@ -108,33 +107,23 @@ class Element(TaggedContent):
 		child = self.__getitem__(key)
 		child = value
 
-	def child(self, tag, content=None, attributes=None, children=None, *, extend=False):
-		child = None
-		try:
-			child = self.__getitem__(tag)
-			if content:
-				if extend:
-					child.content.extend(content)
-				else:
-					child.content = content
-			if attributes:
-				child.attribute = attributes
-			if children:
-				child.children = children
-		except KeyError:
-			self.children.append(Element(tag, self, content))
-			child = self.children[-1]
-		return child
+	def get_child(self, tag):
+		for child in self.children:
+			if child == tag:
+				return child
+		return None
 
-	def attribute(self, tag, content=None, *, extend=False):
-		for attribute in self.attributes:
-			if attribute == tag:
-				if content:
-					if extend:
-						attribute.content.extend(content)
-					else:
-						attribute.content = content
-				return attribute
+	def get_attribute(self, tag):
+		for child in self.children:
+			if child == tag:
+				return child
+		return None
+
+	def add_child(self, tag, content=None, attributes=None, children=None):
+		self.children.append(Element(tag, self, content, attributes, children))
+		return self.children[-1]
+
+	def add_attribute(self, tag, content=None):
 		self.attributes.append(Attribute(tag, content))
 		return self.attributes[-1]
 
@@ -368,7 +357,7 @@ class Parser(object):
 				elif token[0] == Parser.Tokens.ENDBRACKET:
 					if token[1] == ']' and attribute_bracket:
 						if buffer and context.iselement():
-							context.top.attribute(buffer)
+							context.top.add_attribute(buffer)
 							buffer = []
 						attribute_bracket = False
 					elif token[1] == '}' and list_bracket:
@@ -385,12 +374,12 @@ class Parser(object):
 					else:
 						if token[1] == ':' and context.iselement() and not attribute_bracket:
 							if indent:
-								context.push(depth, context.top.child(buffer))
+								context.push(depth, context.top.add_child(buffer))
 							else:
-								context.top = context.top.child(buffer)
+								context.top = context.top.add_child(buffer)
 							buffer = []
 						elif token[1] == '=' and (attribute_bracket or (indent and context.iselement())):
-							context.push(depth, context.top.attribute(buffer))
+							context.push(depth, context.top.add_attribute(buffer))
 							buffer = []
 						else:
 							buffer.append(token[1])
