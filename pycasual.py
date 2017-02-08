@@ -127,6 +127,16 @@ class Element(TaggedContent):
 		self.attributes.append(Attribute(tag, content))
 		return self.attributes[-1]
 
+	def add(self, item):
+		if isinstance(item, Element):
+			item.parent = self
+			self.children.append(item)
+			return self.children[-1]
+		elif isinstance(item, Attribute):
+			self.attributes.append(item)
+			return self.attributes[-1]
+		return None
+
 	def __iter__(self):
 		yield from self.children
 
@@ -189,18 +199,18 @@ class Parser(object):
 		def push(self, depth, anchor=None):
 			self.append((depth, anchor))
 
-		def isattribute(self):
-			if isinstance(self[-1][1], Attribute):
+		def isattribute(self, index=None):
+			if isinstance(self[index or -1][1], Attribute):
 				return True
 			return False
 
-		def iselement(self):
-			if isinstance(self[-1][1], Element):
+		def iselement(self, index=None):
+			if isinstance(self[index or -1][1], Element):
 				return True
 			return False
 
-		def isroot(self):
-			if isinstance(self[-1][1], Root):
+		def isroot(self, index=None):
+			if isinstance(self[index or -1][1], Root):
 				return True
 			return False
 
@@ -302,11 +312,12 @@ class Parser(object):
 				else:
 					depth_test = False
 					if not list_bracket:
-						while depth <= context[-1][0]:
-							if nopop:
-								nopop = False
-							else:
+						if not nopop:
+							while depth < context[-1][0]:
+								print("<< %i:%s" % (context[-1][0], ''.join(context[-1][1].tag)))
 								context.pop()
+						else:
+							nopop = False
 						if depth > context[-1][0]:
 							indent = True
 					continue
@@ -335,15 +346,13 @@ class Parser(object):
 							context.top.content.append(buffer)
 							buffer = []
 						if token[1] == ';':
-							context.pop()
-							nopop = True
+							pass
 						elif token[1] == ',' and attribute_bracket:
 							if context.iselement():
 								context.top.attribute(buffer)
 								buffer = []
 							elif context.isattribute():
-								context.pop()
-								nopop = True
+								pass
 				elif token[0] == Parser.Tokens.BRACKET:
 					if buffer:
 						context.top.content.append(buffer)
@@ -372,17 +381,23 @@ class Parser(object):
 					if list_bracket:
 						buffer.append(token[1])
 					else:
-						if token[1] == ':' and context.iselement() and not attribute_bracket:
-							if indent:
-								context.push(depth, context.top.add_child(buffer))
-							else:
-								context.top = context.top.add_child(buffer)
-							buffer = []
-						elif token[1] == '=' and (attribute_bracket or (indent and context.iselement())):
-							context.push(depth, context.top.add_attribute(buffer))
-							buffer = []
+						if token[1] == ':' and not attribute_bracket:
+							new = Element(buffer)
+						elif token[1] == '=':
+							new = Attribute(buffer)
 						else:
+							new = None
 							buffer.append(token[1])
+						if new:
+							if indent and context.iselement():
+								print(">> %i:%s, parent:%s" % (depth, ''.join(buffer), ''.join(context.top.tag)))
+								context.top.add(new)
+								context.push(depth, new)
+							elif not indent and context.iselement(-2):
+								print("== %i:%s, parent:%s" % (depth, ''.join(buffer), ''.join(context[-2][1].tag)))
+								context[-2][1].add(new)
+								context.top = new
+							buffer = []
 				elif token[0] == Parser.Tokens.COMMENT:
 					pass
 				elif token[0] == Parser.Tokens.UNKNOWN:
