@@ -300,7 +300,6 @@ class Parser(object):
 		attribute_bracket = False
 		list_bracket = False
 		last_bracket = None
-		nopop = False
 
 		context = Parser.Context()
 		context.push(-1, root)
@@ -312,12 +311,8 @@ class Parser(object):
 				else:
 					depth_test = False
 					if not list_bracket:
-						if not nopop:
-							while depth < context[-1][0]:
-								print("<< %i:%s" % (context[-1][0], ''.join(context[-1][1].tag)))
-								context.pop()
-						else:
-							nopop = False
+						while depth < context[-1][0]:
+							context.pop()
 						if depth > context[-1][0]:
 							indent = True
 					continue
@@ -345,14 +340,10 @@ class Parser(object):
 						if buffer:
 							context.top.content.append(buffer)
 							buffer = []
-						if token[1] == ';':
-							pass
-						elif token[1] == ',' and attribute_bracket:
+						if token[1] == ',' and attribute_bracket:
 							if context.iselement():
 								context.top.attribute(buffer)
 								buffer = []
-							elif context.isattribute():
-								pass
 				elif token[0] == Parser.Tokens.BRACKET:
 					if buffer:
 						context.top.content.append(buffer)
@@ -390,11 +381,9 @@ class Parser(object):
 							buffer.append(token[1])
 						if new:
 							if indent and context.iselement():
-								print(">> %i:%s, parent:%s" % (depth, ''.join(buffer), ''.join(context.top.tag)))
 								context.top.add(new)
 								context.push(depth, new)
 							elif not indent and context.iselement(-2):
-								print("== %i:%s, parent:%s" % (depth, ''.join(buffer), ''.join(context[-2][1].tag)))
 								context[-2][1].add(new)
 								context.top = new
 							buffer = []
