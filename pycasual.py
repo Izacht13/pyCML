@@ -17,16 +17,16 @@ def __soutf_html_before__(source, data):
 	else:
 		data["single"] = False
 
+def __soutf_html_content_text(source, data):
+	pass
+
 
 SERIALIZATION_OUTPUTS = {
 	"html": {
-		"before": __soutf_html_before__,
+		"before": __soutf_html_before__, 
 		"content_text": lambda s, d: ''.join(s) if isinstance(s, list) else s,
-		"content": lambda s, d: ''.join(s),
 		"attribute": lambda s, d: "%s=\"%s\"" % s,
-		"attributes": lambda s, d: ''.join(s) if s else '',
-		"child": lambda s, d: s._serialize(SERIALIZATION_OUTPUTS["html"]),
-		"children": lambda s, d: ''.join(s),
+		"attributes": lambda s, d: ' ' + ''.join(s) if s else '',
 		"element": lambda s, d: (
 			"<{tag}{attributes}>" + ("{content}{children}</{tag}>" if not d["single"] else '')
 		).format(**d)
@@ -58,7 +58,10 @@ class Element(object):
 		self.tag = tag or []
 		self.content = content or []
 		self.children = children or []
-		self.attributes = attributes or {}
+		if isinstance(attributes, dict):
+			self.attributes = [[key, value] for key, value in attributes.items()]
+		else:
+			self.attributes = attributes or []
 		self.parent = parent
 
 	def get_child(self, tag):
@@ -71,11 +74,21 @@ class Element(object):
 		self.children.append(Element(tag, self, content, attributes, children))
 		return self.children[-1]
 
+	def get_attribute(self, tag):
+		for attribute in self.attributes:
+			if attribute[0] == tag:
+				return attribute
+		return None
+
+	def add_attribute(self, tag, content=None):
+		self.attributes.append([tag, content])
+		return self.attributes[-1]
+
 	def __getitem__(self, key):
-		return self.attributes[''.join(key) if isinstance(key, list) else key]
+		return self.get_attribute(key) 
 
 	def __setitem__(self, key, value):
-		self.attributes[''.join(key) if isinstance(key, list) else key] = value
+		self.set_attribute(key, value)
 
 	def __eq__(self, x):
 		if isinstance(x, Element):
@@ -102,39 +115,48 @@ class Element(object):
 
 	def _serialize(self, handlers, **kwargs):
 		data = kwargs or {}
-		if callable(handlers.get("before")):
-			data.update(handlers["before"](self, data) or {})
-		containers = {
-			"tag": "tag_text",
-			"content": "content_text",
-			"attributes": "attribute",
-			"children": "child"
-		}
-		for container_name, contained_name in containers.items():
-			container_handler = handlers.get(container_name)
-			contained_handler = handlers.get(contained_name)
-			attr = getattr(self, container_name)
-			contained_list = attr.items() if isinstance(attr, dict) else attr
-			items = None
-			if callable(contained_handler):
-				items = [contained_handler(i, data) for i in contained_list]
-			elif isinstance(contained_handler, str):
-				items = [contained_handler.format(source=i, **data) for i in contained_list]
-			new_container = None
-			if callable(container_handler):
-				new_container = container_handler(items, data)
-			elif isinstance(container_handler, str):
-				new_container = contained_handler.format(source=items, **data)
-			data[container_name] = new_container or data.get(container_name) or ''
-		handler = handlers.get("element")
-		if callable(handler):
-			out = handler(self, data)
-		elif isinstance(handler, str):
-			out = handler.format(source=self, **data)
-		else:
-			out = ""
-		if callable(handlers.get("after")):
-			data.update(handlers["after"](self, data) or {})
+
+		def handle(handler_name, source, container=False, allow_str=True, default="{source}"):
+			handler = handlers.get(handler_name) or default
+			if callable(handler):
+				return [
+					handler(i, data) for i in source
+				] if container else handler(source, data)
+			elif allow_str and isinstance(handler, str):
+				return [
+					handler.format(source=i, **data) for i in source
+				] if container else handler.format(source=source, **data)
+
+		data.update(handle("before", self, False, False, None) or {})
+
+		items = handle("tag_text", self.tag, True)
+		data["tag"] = handle("tag", items, default=lambda s, d: ''.join(s)) or data.get("tag") or ''
+
+		items = handle("content_text", self.content, True)
+		data["content"] = handle("content", items, default=lambda s, d: ''.join(s)) or data.get("content") or ''
+
+		items = [
+			handle("attribute", (
+				handle(
+					"attribute_tag",
+					handle("attribute_tag_text", a[0], True),
+					default=lambda s, d: ''.join(s)
+				) or '',
+				handle(
+					"attribute_content",
+					handle("attribute_content_text", a[1], True),
+					default=lambda s, d: ''.join(s)
+				) or ''
+			)) for a in self.attributes
+		]
+		data["attributes"] = handle("attributes", items, default=lambda s, d: ''.join(s)) or data.get("attributes") or ''
+
+		items = handle("child", self.children, True, default=lambda s, d: s._serialize(handlers, **kwargs))
+		data["children"] = handle("children", items, default=lambda s, d: ''.join(s)) or data.get("children") or ''
+
+		output = handle("element", self) or ''
+		handle("after", self, False, False, None)
+		return output
 
 		return out
 
@@ -217,11 +239,10 @@ class Parser(object):
 
 	class States:
 		UNKNOWN = 0
-		TAG = 1
-		ELEMENT = 2
-		ATTRIBUTE = 3
-		TEXT_LIST = 4
-		ATTRIBUTE_LIST = 5
+		ELEMENT = 1
+		ATTRIBUTE = 2
+		TEXT_LIST = 3
+		ATTRIBUTE_LIST = 4
 
 	class Substates:
 		NONE = 0
@@ -298,9 +319,8 @@ class Parser(object):
 		buffer = Parser.TokenBuffer()
 		depth = 0
 
-		state = Parser.States.TAG
+		state = Parser.States.ELEMENT
 		substate = Parser.Substates.TEST_DEPTH
-		state_data = None
 
 		last_break = None
 		last_indent = None
@@ -325,8 +345,8 @@ class Parser(object):
 					continue
 			else:
 				if token[0] in [Parser.Tokens.LINEBREAK, Parser.Tokens.BREAK]:
-					if state == Parser.States.ATTRIBUTE and state_data:
-						context.element[state_data] = buffer.use()
+					if state == Parser.States.ATTRIBUTE:
+						context.element.attributes[-1][1] = buffer.use()
 						state = Parser.States.ELEMENT
 						state_data = None
 
@@ -342,7 +362,7 @@ class Parser(object):
 							depth = 0
 							substate = Parser.Substates.TEST_DEPTH
 						elif token[1] == ',' and state == Parser.States.ATTRIBUTE_LIST:
-							context.element[buffer.use()] = None
+							context.element.add_attribute(buffer.use())
 					if buffer:
 						context.element.content.append(buffer.use())
 				elif token[0] == Parser.Tokens.BRACKET:
@@ -358,7 +378,7 @@ class Parser(object):
 				elif token[0] == Parser.Tokens.ENDBRACKET:
 					if token[1] == ']' and state == Parser.States.ATTRIBUTE_LIST:
 						if buffer:
-							context.element[buffer.use()] = None
+							context.element.add_attribute(buffer.use())
 						state = Parser.States.ELEMENT
 					elif state == Parser.States.TEXT_LIST:
 						if buffer:
@@ -369,14 +389,14 @@ class Parser(object):
 					if state == Parser.States.TEXT_LIST:
 						buffer.push(token)
 					else:
-						if token[1] == ':' and state != Parser.States.ELEMENT:
+						if token[1] == ':' and state == Parser.States.ELEMENT:
 							if substate == Parser.Substates.INDENT:
 								context.push(context.element.add_child(buffer.use()), depth)
 							else:
 								context.element = context.parent.add_child(buffer.use())
-						elif substate == Parser.Substates.INDENT:
-							state_data = buffer.use()
-							context.element[state_data] = None
+							state = Parser.States.ELEMENT
+						elif state in [Parser.States.ELEMENT, Parser.States.ATTRIBUTE_LIST]:
+							context.element.add_attribute(buffer.use())
 							state = Parser.States.ATTRIBUTE
 				elif token[0] == Parser.Tokens.COMMENT:
 					pass
