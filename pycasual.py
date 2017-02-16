@@ -1,5 +1,6 @@
 import re
 import os
+import html
 
 
 ##############################
@@ -18,18 +19,33 @@ def __soutf_html_before__(source, data):
 		data["single"] = False
 
 def __soutf_html_content_text(source, data):
-	pass
+	if isinstance(source, list):
+		return ''.join([__soutf_html_content_text(text, data) for text in source])
+	else:
+		if source == '\n':
+			return "<br>"
+		return html.escape(source, True).encode('ascii', 'xmlcharrefreplace').decode()
 
 
 SERIALIZATION_OUTPUTS = {
 	"html": {
 		"before": __soutf_html_before__, 
-		"content_text": lambda s, d: ''.join(s) if isinstance(s, list) else s,
-		"attribute": lambda s, d: "%s=\"%s\"" % s,
-		"attributes": lambda s, d: ' ' + ''.join(s) if s else '',
+		"content_text": __soutf_html_content_text,
+		"attribute_content_text": __soutf_html_content_text,
+		"attribute": "{source[0]}=\"{source[1]}\"",
+		"attributes": lambda s, d: ' ' + ' '.join(s) if s else '',
 		"element": lambda s, d: (
 			"<{tag}{attributes}>" + ("{content}{children}</{tag}>" if not d["single"] else '')
 		).format(**d)
+	},
+	"json": {
+		"tag": lambda s, d: "\"tag\":\"%s\"" % ''.join(s),
+		"content_text": lambda s, d: ''.join(s) if isinstance(s, list) else s,
+		"content": lambda s, d: "\"content\":\"%s\"" % ''.join(s),
+		"attribute": "\"{source[0]}\":\"{source[1]}\"",
+		"attributes": lambda s, d: "\"attributes\":{" + ','.join(s) + "}",
+		"children": lambda s, d: "\"children\":[" + ','.join(s) + "]",
+		"element": "{{{tag},{content},{attributes},{children}}}"
 	}
 }
 
@@ -169,13 +185,33 @@ class Element(object):
 
 
 class ParseError(BaseException):
-	pass
+	"""Base exception for errors of the parser."""
+	def __init__(self, message, *args):
+		super().__init__(*args)
+		self.message = message
 
 class IndentMismatch(ParseError):
-	pass
+	"""Raised when both spaces and tabs are used in script indentation."""
 
 class UnknownToken(ParseError):
-	pass
+	"""Raised when an unsupported character is found in the script."""
+
+class ParseStateError(ParseError):
+	"""Base exceptions for parser state related errors."""
+
+class UnknownLineState(ParseStateError):
+	"""Raised when the parser finds itself in an unknown line state."""
+
+class UnexpectedContextTarget(ParseStateError):
+	"""Raised when the current context target is of the wrong type."""
+	def __init__(self, message=None, expected=None, got=None, *args):
+		super().__init__(message or "Expected {expected}, got {got}.", *args)
+		if isinstance(expected, list):
+			if len(expected) > 2:
+				expected = ', '.join(expected[:-1]) + " or " + expected[-1]
+			else:
+				expected = " or ".join(expected)
+		self.message = self.message.format(expected=expected, got=got)
 
 
 ##############################
@@ -188,20 +224,90 @@ class Parser(object):
 
 	class Context(list):
 
-		def push(self, element, depth=None):
-			self.append((element, depth or (self[-1][1] + 1)))
+		class Type:
+			UNKNOWN = 0
+			ELEMENT = 1
+			ATTRIBUTE = 2
+			TEXT_LIST = 3
+			ATTRIBUTE_LIST = 4
+
+		def istype(self, *args):
+			for type in args:
+				if self[-1][2] != type:
+					return False
+			return True
+
+		def swap(self, target, type=None):
+			if not type:
+				type = self.Type.ELEMENT if isinstance(target, Element) else self.Type.UNKNOWN
+			self[-1] = (target, self[-1][1], type)
+
+		def push(self, target=None, depth=None, type=None):
+			if not type:
+				type = self.Type.ELEMENT if isinstance(target, Element) else self.Type.UNKNOWN
+			self.append((target, depth or (self[-1][1] + 1), type))
+
+		def add_child(self, tag, content=None, attributes=None, children=None):
+			if self.istype(self.Type.ELEMENT):
+				return self.target.add_child(tag, content, attributes, children)
+			raise UnexpectedContextTarget(expected=self.Type.ELEMENT, got=self.type)
+		
+		def add_attribute(self, tag, content=None):
+			if self.istype(self.Type.ELEMENT):
+				return self.target.add_attribute(tag, content)
+			elif self.istype(self.Type.ATTRIBUTE_LIST):
+				if self[-2][2] != self.Type.ELEMENT:
+					raise UnexpectedContextTarget(expected=self.Type.ELEMENT, got=self[-2][2])
+				return self[-2][0].add_attribute(tag, content)
+			else:
+				raise UnexpectedContextTarget(expected=[self.Type.ELEMENT, self.Type.ATTRIBUTE_LIST], got=self.type)
+		
+		def get_child(self, tag):
+			if self.istype(self.Type.ELEMENT):
+				return self.target.get_child(tag, content)
+			raise UnexpectedContextTarget(expected=self.Type.ELEMENT, got=self.type)
+
+		def get_attribute(self, tag):
+			if self.istype(self.Type.ELEMENT):
+				return self.target.get_attribute(tag, content)
+			raise UnexpectedContextTarget(expected=self.Type.ELEMENT, got=self.type)
+
+		def use_buffer(self, buffer):
+			if self.istype(self.Type.ELEMENT):
+				self.target.content.append(buffer.use())
+			elif self.istype(self.Type.ATTRIBUTE):
+				self.target[1] = buffer.use()
+			elif self.istype(self.Type.ATTRIBUTE_LIST):
+				if self[-2][2] != ContextType.ELEMENT:
+					raise UnexpectedContextTarget
+				self[-2][0].add_attribute(buffer.use())
+			elif self.istype(self.Type.TEXT_LIST):
+				if self[-2][2] not in [Type.ELEMENT, self.Type.ATTRIBUTE]:
+					raise UnexpectedContextTarget
+				self[-2][0].content.append(buffer.use())
+			else:
+				raise UnexpectedContextTarget(expected=[
+					self.Type.ELEMENT,
+					self.Type.ATTRIBUTE,
+					self.Type.ATTRIBUTE_LIST,
+					self.Type.TEXT_LIST
+				], got=self.type)
 
 		def __getattr__(self, name):
-			if name == "element":
+			if name == "target":
 				return self[-1][0]
 			elif name == "parent":
-				return self[-2][0]
+				if self[-2][2] == self.Type.ELEMENT:
+					return self[-2][0]
+				raise UnexpectedContextTarget(expected=self.Type.ELEMENT, got=self[-2][2])
 			elif name == "depth":
 				return self[-1][1]
-			return AttributeError
+			elif name == "type":
+				return self[-1][2]
+			raise AttributeError
 
 		def __setattr__(self, name, value):
-			if name == "element":
+			if name == "target":
 				self[-1] = (value, self[-1][1])
 			else:
 				super().__setattr__(name, value)
@@ -237,25 +343,19 @@ class Parser(object):
 		WORD = 11
 		SYMBOL = 12
 
-	class States:
+	class LineStates:
 		UNKNOWN = 0
-		ELEMENT = 1
-		ATTRIBUTE = 2
-		TEXT_LIST = 3
-		ATTRIBUTE_LIST = 4
-
-	class Substates:
-		NONE = 0
 		TEST_DEPTH = 1
 		INDENT = 2
+		EQUAL = 3
 
 	__lexemes__ = [(re.compile(x[1]), x[0]) for x in [
 		(Tokens.ESCAPE, r"\\(.)"),
 		(Tokens.COMMENT, r"\/{2,}\s*(([^\/\n\r])*)(\/{2,})*"),
 		(Tokens.RAWSTRING, r"\"(([^\"\\]|\\.)*)\""),
 		(Tokens.STRING, r"'(([^'\\\n\r]|\\.)*)'"),
-		(Tokens.BRACKET, r"([\[\{])"),
-		(Tokens.ENDBRACKET, r"([\]\}])"),
+		(Tokens.BRACKET, r"([\[\{])[ \t\f\v]*"),
+		(Tokens.ENDBRACKET, r"([\]\}])[ \t\f\v]*"),
 		(Tokens.LINEBREAK, r"([\n\r]+)"),
 		(Tokens.BREAK, r"([,;])[ \t\f\v,;]*"),
 		(Tokens.TAG, r"([:=])[ \t\f\v]*"),
@@ -287,7 +387,7 @@ class Parser(object):
 		script_length = len(self.script)
 
 		while True:
-			for lexeme in Parser.__lexemes__:
+			for lexeme in self.__lexemes__:
 				match = lexeme[0].match(self.script[index:])
 				if match:
 					index += match.span()[1] - 1
@@ -316,92 +416,93 @@ class Parser(object):
 		token = next(tokens, None)
 
 		root = Element()
-		buffer = Parser.TokenBuffer()
+		buffer = self.TokenBuffer()
 		depth = 0
 
-		state = Parser.States.ELEMENT
-		substate = Parser.Substates.TEST_DEPTH
+		linestate = self.LineStates.TEST_DEPTH
 
 		last_break = None
 		last_indent = None
 
-		context = Parser.Context()
+		context = self.Context()
 		context.push(root, -1)
 
 		while token:
-			if substate == Parser.Substates.TEST_DEPTH:
-				if token[0] == Parser.Tokens.SPACE:
+			if linestate == self.LineStates.UNKNOWN:
+				raise UnknownLineState
+			elif linestate == self.LineStates.TEST_DEPTH:
+				if token[0] == self.Tokens.SPACE:
 					if last_indent and token[1] != last_indent[1]:
 						raise IndentMismatch
 					depth += 1
 					last_indent = token
-				else:
-					substate = Parser.Substates.NONE
-					if state != Parser.States.TEXT_LIST:
+				elif depth > -1:
+					if not context.istype(self.Context.Type.TEXT_LIST):
 						while depth < context.depth:
 							context.pop()
 						if depth > context.depth:
-							substate = Parser.Substates.INDENT
+							linestate = self.LineStates.INDENT
+						elif depth == context.depth:
+							linestate = self.LineStates.EQUAL
 					continue
 			else:
-				if token[0] in [Parser.Tokens.LINEBREAK, Parser.Tokens.BREAK]:
-					if state == Parser.States.ATTRIBUTE:
-						context.element.attributes[-1][1] = buffer.use()
-						state = Parser.States.ELEMENT
-						state_data = None
+				if token[0] in [self.Tokens.LINEBREAK, self.Tokens.BREAK, self.Tokens.ENDBRACKET]:
+					if context.istype(self.Context.Type.ATTRIBUTE):
+						context.use_buffer(buffer)
+						context.pop()
 
-					if state == Parser.States.TEXT_LIST:
-						if token[0] == Parser.Tokens.LINEBREAK:
-							if buffer[-1][0] != Parser.Tokens.BREAK:
+					if context.istype(self.Context.Type.TEXT_LIST):
+						if token[0] == self.Tokens.LINEBREAK:
+							if buffer[-1][0] != self.Tokens.BREAK:
 								buffer.push(last_break)
 						else:
 							buffer.push(token)
 							last_break = token
-					else:
-						if token[0] == Parser.Tokens.LINEBREAK:
-							depth = 0
-							substate = Parser.Substates.TEST_DEPTH
-						elif token[1] == ',' and state == Parser.States.ATTRIBUTE_LIST:
-							context.element.add_attribute(buffer.use())
+					elif token[0] == self.Tokens.LINEBREAK:
+						depth = 0
+						linestate = self.LineStates.TEST_DEPTH
+					elif token[0] == self.Tokens.ENDBRACKET:
+						if context.istype(self.Context.Type.TEXT_LIST, self.Context.Type.ATTRIBUTE_LIST):
+							last_break = None
+							context.pop()
 					if buffer:
-						context.element.content.append(buffer.use())
-				elif token[0] == Parser.Tokens.BRACKET:
+						context.use_buffer(buffer)
+				elif token[0] == self.Tokens.BRACKET:
 					if buffer:
-						context.element.content.append(buffer.use())
-					if state == Parser.States.ELEMENT:
+						context.use_buffer(buffer)
+					if context.istype(self.Context.Type.ELEMENT):
 						if token[1] == '[':
-							states = Parser.States.ATTRIBUTE_LIST
+							context.push(type=self.Context.Type.ATTRIBUTE_LIST)
 						else:
-							states = Parser.States.TEXT_LIST
+							context.push(type=self.Context.Type.TEXT_LIST)
 					else:
 						buffer.push(token)
-				elif token[0] == Parser.Tokens.ENDBRACKET:
-					if token[1] == ']' and state == Parser.States.ATTRIBUTE_LIST:
-						if buffer:
-							context.element.add_attribute(buffer.use())
-						state = Parser.States.ELEMENT
-					elif state == Parser.States.TEXT_LIST:
-						if buffer:
-							context.element.content.append(buffer.use())
-						state = Parser.States.ELEMENT
-						last_break = None
-				elif token[0] == Parser.Tokens.TAG:
-					if state == Parser.States.TEXT_LIST:
+				elif token[0] == self.Tokens.TAG:
+					if context.istype(self.Context.Type.TEXT_LIST):
 						buffer.push(token)
 					else:
-						if token[1] == ':' and state == Parser.States.ELEMENT:
-							if substate == Parser.Substates.INDENT:
-								context.push(context.element.add_child(buffer.use()), depth)
+						if token[1] == ':':
+							if linestate == self.LineStates.INDENT:
+								context.push(context.add_child(buffer.use()), depth, self.Context.Type.ELEMENT)
 							else:
-								context.element = context.parent.add_child(buffer.use())
-							state = Parser.States.ELEMENT
-						elif state in [Parser.States.ELEMENT, Parser.States.ATTRIBUTE_LIST]:
-							context.element.add_attribute(buffer.use())
-							state = Parser.States.ATTRIBUTE
-				elif token[0] == Parser.Tokens.COMMENT:
+								context.swap(context.parent.add_child(buffer.use()), self.Context.Type.ELEMENT)
+						else:
+							if linestate == self.LineStates.INDENT:
+								context.push(context.add_attribute(buffer.use()), depth, self.Context.Type.ATTRIBUTE)
+							else:
+								context.swap(context.parent.add_attribute(buffer.use()), self.Context.Type.ATTRIBUTE)
+				elif token[0] == self.Tokens.COMMENT:
 					pass
-				elif token[0] == Parser.Tokens.UNKNOWN:
+				elif token[0] == self.Tokens.UNKNOWN:
 					raise UnknownToken
+				elif token[0] == self.Tokens.ESCAPE:
+					control = {
+						'n': '\n',
+						'f': '\f',
+						'v': '\v',
+						't': '\t'
+					}.get(token[1])
+					buffer.push((token[0], control or token[1], token[2]))
 				else:
 					buffer.push(token)
 

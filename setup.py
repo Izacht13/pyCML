@@ -9,7 +9,7 @@ except ImportError:
 
 setup(
     name="pycasual",
-    version="0.0.2",
+    version="0.0.3",
     url="http://github.com/izacht13/pyCasual/",
     license="MIT",
     author="Isaac Torbett",
