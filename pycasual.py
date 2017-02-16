@@ -278,7 +278,7 @@ class Parser(object):
 			elif self.istype(self.Type.ATTRIBUTE):
 				self.target[1] = buffer.use()
 			elif self.istype(self.Type.ATTRIBUTE_LIST):
-				if self[-2][2] != ContextType.ELEMENT:
+				if self[-2][2] != self.Type.ELEMENT:
 					raise UnexpectedContextTarget
 				self[-2][0].add_attribute(buffer.use())
 			elif self.istype(self.Type.TEXT_LIST):
