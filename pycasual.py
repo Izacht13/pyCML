@@ -24,14 +24,13 @@ def __soutf_html_content_text(source, data):
 	else:
 		if source == '\n':
 			return "<br>"
-		return html.escape(source, True).encode('ascii', 'xmlcharrefreplace').decode()
+		return source
 
 
 SERIALIZATION_OUTPUTS = {
 	"html": {
 		"before": __soutf_html_before__, 
 		"content_text": __soutf_html_content_text,
-		"attribute_content_text": __soutf_html_content_text,
 		"attribute": "{source[0]}=\"{source[1]}\"",
 		"attributes": lambda s, d: ' ' + ' '.join(s) if s else '',
 		"element": lambda s, d: (
