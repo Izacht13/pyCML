@@ -97,7 +97,7 @@ class Element(object):
 		return None
 
 	def add_attribute(self, tag, content=None):
-		self.attributes.append([tag, content])
+		self.attributes.append([tag, content or []])
 		return self.attributes[-1]
 
 	def __getitem__(self, key):
@@ -327,6 +327,12 @@ class Parser(object):
 
 		def pop(self):
 			return self.stack.pop()
+		
+		def __bool__(self):
+			return bool(self.stack)
+
+		def __str__(self):
+			return self.stack.__str__()
 
 	class Tokens:
 		UNKNOWN = 0
