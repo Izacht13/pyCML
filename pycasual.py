@@ -374,13 +374,17 @@ class Parser(object):
 		path = match.group(1)
 		regex = match.group(2)
 		if path:
-			with open(os.path.join(self.import_directory, path)) as file:
-				return re.search(regex, file.read()).group(0) if regex else file.read()
-		return ''
+			for directory in self.import_directories:
+				try:
+					with open(os.path.join(directory, path)) as file:
+						return re.search(regex, file.read()).group(0) if regex else file.read()
+				except Exception:
+					continue
+		return ""
 
 	def __init__(self, script=None, import_directory=None):
 		self.script = script
-		self.import_directory = import_directory or '.'
+		self.import_directory = import_directory or ['.']
 
 	def tokens(self, script=None):
 		"""Returns a generator of tokens matched in the script."""
@@ -404,9 +408,9 @@ class Parser(object):
 			else:
 				break
 
-	def parse(self, script=None, preprocess=True, *, import_directory=None, tokens=None):
+	def parse(self, script=None, preprocess=True, *, import_directories=None, tokens=None):
 		self.script = script or self.script
-		self.import_directory = import_directory or self.import_directory
+		self.import_directories = import_directories or self.import_directories
 		if not self.script:
 			return
 		else:
@@ -516,5 +520,5 @@ class Parser(object):
 		return root
 
 
-def parse(script=None):
-	return Parser(script).parse()
+def parse(script=None, **kwargs):
+	return Parser(script).parse(**kwargs)
